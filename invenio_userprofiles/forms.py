@@ -2,6 +2,7 @@
 #
 # This file is part of Invenio.
 # Copyright (C) 2015-2018 CERN.
+# Copyright (C)      2023 Graz University of Technology.
 #
 # Invenio is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -14,9 +15,9 @@ from flask_login import current_user
 from flask_security.forms import email_required, email_validator, unique_user_email
 from flask_wtf import FlaskForm
 from invenio_i18n import lazy_gettext as _
-from invenio_i18n.ext import InvenioI18N
 from werkzeug.local import LocalProxy
 from wtforms import (
+    BooleanField,
     FormField,
     RadioField,
     SelectField,
@@ -32,7 +33,7 @@ from wtforms.validators import (
     ValidationError,
 )
 
-from .models import UserProfileProxy
+from .models import NotificationPreferencesProxy, UserProfileProxy
 from .validators import USERNAME_RULES, validate_username
 
 
@@ -237,6 +238,32 @@ class PreferencesForm(FlaskForm):
     #    choices=pytz.all_timezones,
     #    validators=[validators.InputRequired()],
     # )
+
+    def process(self, formdata=None, obj=None, data=None, extra_filters=None, **kwargs):
+        """Build a proxy around the object."""
+        if obj is not None:
+            obj = self.profile_proxy_cls(obj)
+        super().process(
+            formdata=formdata, obj=obj, data=data, extra_filters=extra_filters, **kwargs
+        )
+
+    def populate_obj(self, user):
+        """Populates the obj."""
+        user = self.profile_proxy_cls(user)
+        super().populate_obj(user)
+
+
+class NotificationsForm(FlaskForm):
+    """Form for editing user notification preferences."""
+
+    profile_proxy_cls = NotificationPreferencesProxy
+
+    enabled = BooleanField(
+        _("Notify me"),
+        description=_(
+            "Enable or disable notifications for events that are relevant to your user."
+        ),
+    )
 
     def process(self, formdata=None, obj=None, data=None, extra_filters=None, **kwargs):
         """Build a proxy around the object."""

@@ -31,6 +31,7 @@ from invenio_theme.proxies import current_theme_icons
 
 from .forms import (
     EmailProfileForm,
+    NotificationsForm,
     PreferencesForm,
     ProfileForm,
     VerificationForm,
@@ -101,6 +102,7 @@ def userprofile(value):
         icon=LazyString(lambda: f'<i class="{current_theme_icons.user}"></i>'),
     ),
     order=0,
+    active_when=lambda: request.endpoint == "invenio_userprofiles.profile",
 )
 @register_breadcrumb(blueprint, "breadcrumbs.settings.profile", _("Profile"))
 def profile():
@@ -139,6 +141,45 @@ def profile():
         verification_form=verification_form,
         profile_form=profile_form,
         preferences_form=preferences_form,
+    )
+
+
+@blueprint.route("/notifications", methods=["GET", "POST"])
+@login_required
+@register_menu(
+    blueprint,
+    "settings.notifications",
+    # NOTE: Menu item text (icon replaced by a bell icon).
+    _(
+        "%(icon)s Notifications",
+        icon=LazyString(lambda: f'<i class="{current_theme_icons.bell}"></i>'),
+    ),
+    order=3,
+    active_when=lambda: request.endpoint == "invenio_userprofiles.notifications",
+)
+@register_breadcrumb(
+    blueprint, "breadcrumbs.settings.notifications", _("Notifications")
+)
+def notifications():
+    """View for notification settings."""
+    notifications_form = NotificationsForm(
+        formdata=None, obj=current_user, prefix="notifications"
+    )
+
+    # Pick form
+    form_name = request.form.get("submit", None)
+    form = notifications_form if form_name else None
+
+    # Process form
+    if form:
+        form.process(formdata=request.form)
+        if form.validate_on_submit():
+            handle_notifications_form(form)
+            return redirect(url_for(".notifications"), code=303)  # this endpoint
+
+    return render_template(
+        "invenio_userprofiles/settings/notifications.html",
+        notifications_form=notifications_form,
     )
 
 
@@ -202,3 +243,12 @@ def handle_preferences_form(form):
     current_app.extensions["security"].datastore.commit()
     # NOTE: Flash message after successful update of profile.
     flash(_("Preferences were updated."), category="success")
+
+
+def handle_notifications_form(form):
+    """Handle notification preferences form."""
+    form.populate_obj(current_user)
+    db.session.add(current_user)
+    current_app.extensions["security"].datastore.commit()
+    # NOTE: Flash message after successful update of profile.
+    flash(_("Notification preferences were updated."), category="success")

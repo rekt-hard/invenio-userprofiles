@@ -2,6 +2,7 @@
 #
 # This file is part of Invenio.
 # Copyright (C) 2015-2018 CERN.
+# Copyright (C)      2023 Graz University of Technology.
 #
 # Invenio is free software; you can redistribute it and/or modify it
 # under the terms of the MIT License; see LICENSE file for more details.
@@ -24,9 +25,17 @@ class UserProfileProxy:
     """Proxy for a user that allows mapping the form to the user object."""
 
     _profile_attrs = ["full_name", "affiliations"]
-    _preferences_attrs = ["email_visibility", "visibility", "locale", "timezone"]
+    _preferences_attrs = [
+        "email_visibility",
+        "visibility",
+        "locale",
+        "timezone",
+    ]
     _read_only_attrs = ["email_repeat"]
-    _aliases = {"email_repeat": "email", "user_id": "id"}
+    _aliases = {
+        "email_repeat": "email",
+        "user_id": "id",
+    }
 
     def __init__(self, user):
         """."""
@@ -34,7 +43,9 @@ class UserProfileProxy:
 
     def __getattr__(self, attr):
         """."""
-        if attr in self._profile_attrs:
+        if attr == "notifications_enabled":
+            return self._user.preferences["notifications"]["enabled"]
+        elif attr in self._profile_attrs:
             return self._user.user_profile.get(attr, None)
         elif attr in self._preferences_attrs:
             return self._user.preferences.get(attr, None)
@@ -91,6 +102,36 @@ class UserProfileProxy:
         # Kept for backward compatibility
         user = current_app.extensions["security"].datastore.find_user(id=user_id)
         return cls(user) if user else None
+
+
+class NotificationPreferencesProxy:
+    """Proxy for a user that allows mapping the form to the user object."""
+
+    _notification_preferences = lambda self: self._user.preferences.get(
+        "notifications", {}
+    )
+
+    def __init__(self, user):
+        """."""
+        super().__setattr__("_user", user)
+
+    def __getattr__(self, attr):
+        """."""
+        return self._notification_preferences.get(attr, None)
+
+    def __setattr__(self, attr, value):
+        """."""
+        self._user.preferences = {
+            **self._user.preferences,
+            "notifications": {
+                **(self._notification_preferences()),
+                attr: value,
+            },
+        }
+
+    def __hasattr__(self, attr):
+        """."""
+        return attr in self._notification_preferences
 
 
 # Backward compatibility
